@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>K-trip API 기능 테스트용 (디자인 없음)</title>
+<style>
+  /* 디자인은 프론트 담당이 따로 할 거라 최소한의 배치만. 예쁘게 만들 필요 없음 */
+  body { font-family: sans-serif; max-width: 900px; margin: 20px auto; padding: 0 10px; }
+  fieldset { margin-bottom: 20px; padding: 10px; }
+  legend { font-weight: bold; }
+  label { display: inline-block; width: 110px; }
+  input, select, textarea { margin: 4px 0; width: 260px; }
+  textarea { height: 50px; vertical-align: top; }
+  button { margin: 6px 4px 6px 0; padding: 4px 10px; }
+  pre { background: #f0f0f0; padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; }
+  #tokenBox { background: #eef7ee; padding: 8px; }
+  .place-item { cursor: pointer; padding: 2px 0; }
+  .place-item:hover { background: #ddd; }
+</style>
+</head>
+<body>
+
+<h2>K-trip API 기능 테스트 (디자인 없음, 기능 확인용)</h2>
+
+<fieldset>
+  <legend>0. 서버 주소</legend>
+  <label>Base URL</label>
+  <input id="baseUrl" value="http://localhost:8000" />
+  <button onclick="checkHealth()">연결 확인</button>
+  <pre id="healthOut"></pre>
+</fieldset>
+
+<fieldset>
+  <legend>1. 회원가입</legend>
+  <div><label>email</label><input id="suEmail" value="test1@ktrip.com" /></div>
+  <div><label>nickname</label><input id="suNickname" value="tester1" /></div>
+  <div><label>password</label><input id="suPassword" type="password" value="pw12345" /></div>
+  <button onclick="signup()">회원가입</button>
+  <pre id="signupOut"></pre>
+</fieldset>
+
+<fieldset>
+  <legend>2. 로그인</legend>
+  <div><label>email</label><input id="liEmail" value="test1@ktrip.com" /></div>
+  <div><label>password</label><input id="liPassword" type="password" value="pw12345" /></div>
+  <button onclick="login()">로그인</button>
+  <div id="tokenBox">현재 토큰: <span id="tokenDisplay">없음</span></div>
+  <pre id="loginOut"></pre>
+</fieldset>
+
+<fieldset>
+  <legend>3. AI 일정 추천</legend>
+  <div>
+    <label>테마 (복수선택)</label>
+    <select id="itThemes" multiple size="5">
+      <option value="food" selected>food (맛집)</option>
+      <option value="sightseeing">sightseeing (관광지)</option>
+      <option value="culture">culture (문화)</option>
+      <option value="shopping">shopping (쇼핑)</option>
+      <option value="hallyu">hallyu (한류, 아직 TODO)</option>
+    </select>
+  </div>
+  <div><label>여행 일수</label><input id="itDays" type="number" value="3" /></div>
+  <div><label>하루 장소수</label><input id="itPerDay" type="number" value="5" /></div>
+  <div><label>지역코드</label><input id="itArea" value="1" placeholder="1=서울, 6=부산, 비우면 전체" /></div>
+  <button onclick="getItinerary()">일정 추천 받기</button>
+  <div id="itPlaceList"></div>
+  <pre id="itineraryOut"></pre>
+</fieldset>
+
+<fieldset>
+  <legend>4. 리뷰</legend>
+  <div><label>place_id</label><input id="rvPlaceId" type="number" value="1" /> (위 일정/검색 결과에서 장소 클릭하면 자동 입력됨)</div>
+  <div><label>평점(1~5)</label><input id="rvRating" type="number" value="5" min="1" max="5" /></div>
+  <div><label>내용</label><textarea id="rvContent">기능 테스트 리뷰입니다</textarea></div>
+  <button onclick="postReview()">리뷰 작성 (로그인 필요)</button>
+  <button onclick="listReviews()">리뷰 목록 조회</button>
+  <div><label>좋아요할 review_id</label><input id="rvLikeId" type="number" value="1" />
+    <button onclick="toggleLike()">좋아요 토글 (로그인 필요)</button>
+  </div>
+  <pre id="reviewOut"></pre>
+</fieldset>
+
+<fieldset>
+  <legend>5. 게시판</legend>
+  <div><label>제목</label><input id="bdTitle" value="오늘 서울 날씨 어때요?" /></div>
+  <div><label>내용</label><textarea id="bdContent">우산 필요할까요?</textarea></div>
+  <div>
+    <label>카테고리</label>
+    <select id="bdCategory">
+      <option value="qna">qna (Q&amp;A)</option>
+      <option value="tips">tips (TIPS)</option>
+      <option value="review">review (REVIEW - place_id/rating 필요)</option>
+      <option value="companion">companion (COMPANION - 동행 모집)</option>
+    </select>
+  </div>
+  <div><label>지역코드</label><input id="bdArea" value="1" /></div>
+  <button onclick="postBoard()">글 작성 (로그인 필요)</button>
+  <button onclick="listBoard()">글 목록 조회</button>
+  <pre id="boardOut"></pre>
+
+  <div><label>post_id</label><input id="cmPostId" type="number" value="1" /></div>
+  <div><label>댓글 내용</label><input id="cmContent" value="오늘은 맑아요!" /></div>
+  <button onclick="postComment()">댓글 작성 (로그인 필요)</button>
+  <button onclick="listComments()">댓글 목록 조회</button>
+  <pre id="commentOut"></pre>
+</fieldset>
+
+<fieldset>
+  <legend>6. 지도 - 위치기반 가까운 관광지</legend>
+  <div><label>위도(lat)</label><input id="nbLat" value="37.5665" /></div>
+  <div><label>경도(lon)</label><input id="nbLon" value="126.9780" /></div>
+  <div><label>반경(km)</label><input id="nbRadius" value="5" /></div>
+  <button onclick="getNearby()">주변 관광지 검색</button>
+  <div id="nearbyPlaceList"></div>
+  <pre id="nearbyOut"></pre>
+</fieldset>
+
+<script>
+  let token = null;
+
+  function baseUrl() {
+    return document.getElementById('baseUrl').value.replace(/\/$/, '');
+  }
+
+  function authHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    return headers;
+  }
+
+  async function callApi(path, options, outEl) {
+    try {
+      const res = await fetch(baseUrl() + path, options);
+      const text = await res.text();
+      let pretty;
+      try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { pretty = text; }
+      document.getElementById(outEl).textContent = `[${res.status}]\n` + pretty;
+      return res.ok ? JSON.parse(text) : null;
+    } catch (err) {
+      document.getElementById(outEl).textContent = '요청 실패 (서버가 안 켜져있거나 CORS 문제일 수 있음): ' + err;
+      return null;
+    }
+  }
+
+  function checkHealth() {
+    callApi('/', { method: 'GET' }, 'healthOut');
+  }
+
+  function signup() {
+    const body = JSON.stringify({
+      email: document.getElementById('suEmail').value,
+      nickname: document.getElementById('suNickname').value,
+      password: document.getElementById('suPassword').value,
+    });
+    callApi('/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, 'signupOut');
+  }
+
+  async function login() {
+    const body = JSON.stringify({
+      email: document.getElementById('liEmail').value,
+      password: document.getElementById('liPassword').value,
+    });
+    const data = await callApi('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }, 'loginOut');
+    if (data && data.access_token) {
+      token = data.access_token;
+      document.getElementById('tokenDisplay').textContent = token.slice(0, 24) + '... (저장됨)';
+    }
+  }
+
+  function renderPlaceList(containerId, places, targetInputId) {
+    const container = document.getElementById(containerId);
+    if (!places || !places.length) { container.innerHTML = '(결과 없음)'; return; }
+    container.innerHTML = '<b>장소 클릭하면 리뷰 place_id에 자동 입력됨:</b><br/>' +
+      places.map(p => `<div class="place-item" onclick="document.getElementById('${targetInputId}').value=${p.id}">#${p.id} ${p.title} (${p.theme_code})</div>`).join('');
+  }
+
+  async function getItinerary() {
+    const themes = Array.from(document.getElementById('itThemes').selectedOptions).map(o => o.value);
+    const params = new URLSearchParams();
+    themes.forEach(t => params.append('themes', t));
+    params.append('days', document.getElementById('itDays').value);
+    params.append('places_per_day', document.getElementById('itPerDay').value);
+    const area = document.getElementById('itArea').value;
+    if (area) params.append('area_code', area);
+
+    const data = await callApi('/itinerary?' + params.toString(), { method: 'GET' }, 'itineraryOut');
+    if (data) {
+      const allPlaces = data.flatMap(day => day.places);
+      renderPlaceList('itPlaceList', allPlaces, 'rvPlaceId');
+    }
+  }
+
+  function postReview() {
+    const placeId = document.getElementById('rvPlaceId').value;
+    const body = JSON.stringify({
+      rating: Number(document.getElementById('rvRating').value),
+      content: document.getElementById('rvContent').value,
+    });
+    callApi(`/places/${placeId}/reviews`, { method: 'POST', headers: authHeaders(), body }, 'reviewOut');
+  }
+
+  function listReviews() {
+    const placeId = document.getElementById('rvPlaceId').value;
+    callApi(`/places/${placeId}/reviews`, { method: 'GET' }, 'reviewOut');
+  }
+
+  function toggleLike() {
+    const reviewId = document.getElementById('rvLikeId').value;
+    callApi(`/reviews/${reviewId}/like`, { method: 'POST', headers: authHeaders() }, 'reviewOut');
+  }
+
+  function postBoard() {
+    const body = JSON.stringify({
+      title: document.getElementById('bdTitle').value,
+      content: document.getElementById('bdContent').value,
+      category: document.getElementById('bdCategory').value,
+      area_code: document.getElementById('bdArea').value || null,
+    });
+    callApi('/board/posts', { method: 'POST', headers: authHeaders(), body }, 'boardOut');
+  }
+
+  function listBoard() {
+    const area = document.getElementById('bdArea').value;
+    const params = new URLSearchParams();
+    if (area) params.append('area_code', area);
+    callApi('/board/posts?' + params.toString(), { method: 'GET' }, 'boardOut');
+  }
+
+  function postComment() {
+    const postId = document.getElementById('cmPostId').value;
+    const body = JSON.stringify({ content: document.getElementById('cmContent').value });
+    callApi(`/board/posts/${postId}/comments`, { method: 'POST', headers: authHeaders(), body }, 'commentOut');
+  }
+
+  function listComments() {
+    const postId = document.getElementById('cmPostId').value;
+    callApi(`/board/posts/${postId}/comments`, { method: 'GET' }, 'commentOut');
+  }
+
+  async function getNearby() {
+    const params = new URLSearchParams({
+      lat: document.getElementById('nbLat').value,
+      lon: document.getElementById('nbLon').value,
+      radius_km: document.getElementById('nbRadius').value,
+    });
+    const data = await callApi('/places/nearby?' + params.toString(), { method: 'GET' }, 'nearbyOut');
+    if (data) renderPlaceList('nearbyPlaceList', data, 'rvPlaceId');
+  }
+</script>
+
+</body>
+</html>
